@@ -38,7 +38,7 @@ h3 { margin-bottom: 12px; font: 700 14px var(--sans); }
 
 /* Topology */
 .pathway { min-height: 172px; gap: 15px; }
-.node { position: relative; display: flex; min-width: 140px; flex-direction: column; gap: 5px; padding: 16px; background: var(--panel); border: 1px solid var(--line); }
+.node { position: relative; display: flex; min-width: 140px; overflow-wrap: anywhere; flex-direction: column; gap: 5px; padding: 16px; background: var(--panel); border: 1px solid var(--line); }
 .node-icon { color: var(--green); font: 23px Georgia; }
 .node-title { font: 700 14px var(--sans); }
 .node small, .replica-label, .metric-name, .health-row small, .replica-detail { color: var(--muted); font: 11px var(--sans); }
@@ -106,7 +106,7 @@ button.secondary:hover { background: #dda53b; }
 .health-pill.is-down { color: var(--red); }
 
 /* Scenario lab */
-.lab-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+.lab-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 20px; }
 .lab-group > h3 { padding-bottom: 8px; border-bottom: 2px solid var(--navy); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
 .case { display: grid; gap: 10px; margin-bottom: 12px; padding: 16px 18px; }
 .case.is-running { border-color: var(--yellow); }
@@ -181,7 +181,7 @@ button.secondary:hover { background: #dda53b; }
 footer { justify-content: space-between; padding-top: 27px; color: #839087; font: 10px var(--sans); letter-spacing: .08em; }
 
 @media (max-width: 960px) {
-  .lab-columns, .cluster-grid, .terminal-grid { grid-template-columns: 1fr; }
+  .lab-columns, .cluster-grid, .terminal-grid, .console-grid { grid-template-columns: minmax(0, 1fr); }
   .pod-head { display: none; }
   .pod-row { grid-template-columns: 1fr 1fr; }
   .pod-row > span:not(.pod-name):not(.pod-action)::before { content: attr(data-label) ': '; color: var(--muted); }
@@ -204,7 +204,7 @@ footer { justify-content: space-between; padding-top: 27px; color: #839087; font
   .shell { width: calc(100% - 32px); padding-top: 16px; }
   .topbar-meta { gap: 6px; font-size: 10px; }
   .topbar-meta .version { display: none; }
-  h1 { font-size: 53px; }
+  h1 { font-size: 40px; letter-spacing: -1.5px; }
   .intro { font-size: 17px; }
   .section-heading { align-items: start; flex-direction: column; gap: 12px; }
   .topology-caption { align-self: start; }

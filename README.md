@@ -15,6 +15,32 @@ A **Pod IP** belongs to one replaceable pod and can change. A **Service IP** is 
 
 NGINX uses the Kubernetes Service DNS name in its upstream. Kubernetes Service networking supplies access to healthy endpoints; NGINX controls the proxy hop and upstream behavior. With one NGINX proxy and Kubernetes Service routing, request patterns are not a promise of strict one-request-per-pod round robin. Use the returned hostname and logs as observations, not fabricated guarantees.
 
+The default NGINX route opens a new upstream connection per request, so the Service can choose a pod for each request. `/api/keepalive/info` deliberately reuses upstream connections to show that Kubernetes balances *connections*: reused connections stay on one pod.
+
+## Frontend scenario lab
+
+The page polls NGINX (`/nginx-health`, `/nginx-status`) and the cluster (`/api/cluster`) every two seconds and shows live replicas, pod status, restarts, Service endpoints and recent Kubernetes events. Every case below is one click:
+
+| Case | What you see |
+| --- | --- |
+| N1 Load balancing | 10 requests spread across ready pods |
+| N2 Keep-alive pinning | fresh connections spread out; a reused connection sticks to one pod |
+| N3 App error passthrough | app's 500/503/404/418 forwarded unchanged (source: app) |
+| N4 Gateway timeout | 2 s → 200; 8 s → NGINX's own 504 (5 s `proxy_read_timeout`) |
+| N5 Rate limiting | `/api/limited` (2 r/s, burst 3) → mix of 200 and NGINX 429 |
+| N6 Who answered? | `/nginx-health` answered by NGINX alone vs. app 404 for an unknown API path |
+| N7 No ready endpoints | all pods unready for 20 s → NGINX 502, then automatic recovery |
+| K1 Readiness failure | one pod unready for 30 s: still running, removed from endpoints |
+| K2 Container crash | process exits → kubelet restarts it, RESTARTS +1, same pod name |
+| K3 Liveness failure | liveness fails → kubelet restarts the container after ~30 s |
+| K4 Pod deleted | ReplicaSet creates a replacement with a new name |
+| K5 Scaling | 1–8 replicas |
+| K6 Rolling update | rollout restart while traffic keeps succeeding (the `preStop` sleep prevents dropped requests) |
+
+NGINX-generated errors (429, 502, 504) are JSON with `"source":"nginx"`, so the page can tell them apart from application errors. Responses carry `X-Proxy-Host`, `X-Request-ID`, `X-Upstream-Addr` and `X-Upstream-Status` headers. NGINX probes use `/nginx-health`, so NGINX stays ready even when every app pod is down.
+
+The cluster view and the K4–K6 and N7 buttons use the `kubescale-app` ServiceAccount (`k8s/app-account.yaml`): a namespace-scoped Role that can list pods, events and EndpointSlices, delete pods, and get/patch only the `kubescale-app` Deployment. All mutating endpoints return `404` unless `ENABLE_TEST_CONTROLS=true`. The page also lists terminal-only cases (NGINX pod deleted, bad image, never-ready release, insufficient capacity) and shows their effects live.
+
 ## Prerequisites (macOS Apple Silicon)
 
 Install and start Docker Desktop, then install `kubectl` and Minikube. The scripts use the Docker driver, which works with Docker Desktop on Apple Silicon. The Node and NGINX images used here publish multi-architecture variants; the application build explicitly targets `linux/arm64`.
@@ -124,7 +150,7 @@ curl -X POST http://127.0.0.1:3000/api/test/ready
 kubectl get endpoints kubescale-app -w
 ```
 
-The controls return `404` unless `ENABLE_TEST_CONTROLS=true`. To demonstrate a deployment-wide unready state instead, edit the ConfigMap value to `HEALTH_MODE: unhealthy`, apply it, and restart the Deployment; restore `healthy` afterward. This is intentionally a test mechanism, not a permanent production health behavior.
+The controls return `404` unless `ENABLE_TEST_CONTROLS=true`. Setting `HEALTH_MODE: unhealthy` in the ConfigMap and restarting the Deployment does *not* take every pod down: new pods never become ready, so the rolling update stalls after replacing one pod (`maxUnavailable: 1`) and the old ready pods keep serving. Restore `healthy` and restart again afterward. For a true zero-endpoint outage, use the N7 button. This is intentionally a test mechanism, not a permanent production health behavior.
 
 ### F. Cleanup
 
