@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KubeScale Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">K</span><span>KubeScale <b>Demo</b></span></div>
+      <div class="topbar-meta"><span id="live-indicator" class="live-indicator is-checking"></span><span id="connection-status">Checking gateway...</span><span id="version" class="version">v--</span></div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Local infrastructure lab / 01</p>
+        <h1>See every request<br><em>find its home.</em></h1>
+        <p class="intro">A small, visible experiment in availability. NGINX accepts the traffic, Kubernetes selects a ready replica, and the response tells you where it landed. Then break things on purpose and watch each layer react.</p>
+      </div>
+      <div class="hero-note"><span id="hero-ready" class="note-number">--</span><span>application replicas<br>ready to serve</span></div>
+    </section>
+
+    <section class="topology" aria-labelledby="topology-title">
+      <div class="section-heading"><div><p class="section-kicker">Live topology</p><h2 id="topology-title">The request path</h2></div><span class="topology-caption">Browser traffic only enters through NGINX</span></div>
+      <div class="pathway">
+        <div class="node node-entry"><span class="node-icon">↗</span><span class="node-title">Browser</span><small>your request</small></div>
+        <span class="path-line"><i></i></span>
+        <div class="node node-proxy"><span class="node-icon">⇄</span><span class="node-title">NGINX</span><small id="nginx-detail">reverse proxy · :30080</small><span id="nginx-state" class="node-state">CHECKING</span></div>
+        <span class="path-line"><i></i></span>
+        <div class="node node-service"><span class="node-icon">◎</span><span class="node-title">Kubernetes Service</span><small id="service-detail">stable internal route</small><span id="service-state" class="node-state">--</span></div>
+        <span class="path-line"><i></i></span>
+        <div class="replica-stack">
+          <div class="replica-label"><span>READY REPLICAS</span><strong id="replica-count">--</strong></div>
+          <div id="replica-dots" class="replica-dots" aria-live="polite"></div>
+          <small id="replica-detail" class="replica-detail">Waiting for cluster data</small>
+        </div>
+      </div>
+      <div id="diagnosis" class="diagnosis is-checking"><strong id="diagnosis-title">Checking the gateway…</strong><span id="diagnosis-detail">Polling NGINX and the cluster every two seconds.</span></div>
+      <ul class="legend" aria-label="Replica legend">
+        <li><i class="dot-ready"></i>Ready, receiving traffic</li>
+        <li><i class="dot-unready"></i>Running, not ready</li>
+        <li><i class="dot-starting"></i>Pending / starting</li>
+        <li><i class="dot-failing"></i>Crashing / image error</li>
+        <li><i class="dot-terminating"></i>Terminating</li>
+      </ul>
+    </section>
+
+    <section class="console-grid" aria-labelledby="console-title">
+      <article class="response-panel">
+        <div class="section-heading compact"><div><p class="section-kicker">Traffic console</p><h2 id="console-title">Where did it land?</h2></div><span class="pulse-label"><i></i> listening</span></div>
+        <div class="response-value"><span id="latest-label" class="response-label">LATEST BACKEND</span><strong id="latest-hostname">Waiting for a request</strong><span id="latest-time" class="muted">Run a request to identify the serving container.</span></div>
+        <div class="actions"><button id="request-once" type="button"><span>↗</span> Request once</button><button id="request-burst" class="secondary" type="button"><span>∿</span> Send 10 requests</button></div>
+      </article>
+      <aside class="metrics-panel">
+        <div class="metric"><span class="metric-value" id="request-count">0</span><span class="metric-name">requests observed</span></div>
+        <div class="metric"><span class="metric-value" id="backend-count">0</span><span class="metric-name">backends reached</span></div>
+        <div class="metric"><span class="metric-value metric-small" id="success-count">0</span><span class="metric-name">answered 2xx</span></div>
+        <div class="metric"><span class="metric-value metric-small" id="error-split">0 / 0</span><span class="metric-name">errors: NGINX / app</span></div>
+        <div class="health-row"><span id="health-icon" class="health-icon">…</span><div><strong id="health-title">Checking gateway</strong><small id="health-detail">Waiting for the first poll</small></div><span id="health-status" class="health-pill">--</span></div>
+      </aside>
+    </section>
+
+    <section class="lab" aria-labelledby="lab-title">
+      <div class="section-heading"><div><p class="section-kicker">Scenario lab</p><h2 id="lab-title">Every case, one click</h2></div><span class="topology-caption">Each button sends real traffic through NGINX</span></div>
+      <p id="controls-note" class="notice" hidden></p>
+      <div class="lab-columns">
+        <div class="lab-group">
+          <h3>NGINX cases</h3>
+
+          <article class="case">
+            <header><span class="case-code">N1</span><h4>Load balancing</h4><span class="case-expect">200</span></header>
+            <p>NGINX opens a new connection to the Service for every request, so Kubernetes can pick a different ready pod each time.</p>
+            <div class="case-actions"><button type="button" data-action="balance">Send 10 requests</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N2</span><h4>Keep-alive pinning</h4><span class="case-expect">200</span></header>
+            <p>A route that reuses upstream connections tends to stay on one pod, because the Service balances connections, not requests.</p>
+            <div class="case-actions"><button type="button" data-action="keepalive">Compare 8 + 8 requests</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N3</span><h4>App error passthrough</h4><span class="case-expect">5xx / 4xx</span></header>
+            <p>The app returns an error status. NGINX forwards the app's response unchanged; it is not a gateway failure.</p>
+            <div class="case-actions">
+              <select data-input="status" aria-label="Status code"><option>500</option><option>503</option><option>404</option><option>418</option></select>
+              <button type="button" data-action="upstreamError">Trigger</button>
+            </div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N4</span><h4>Gateway timeout</h4><span class="case-expect">200 / 504</span></header>
+            <p>This route has a 5 s <code>proxy_read_timeout</code>. A slower app answer is cut off and NGINX returns its own 504.</p>
+            <div class="case-actions">
+              <button type="button" class="secondary" data-action="delay" data-ms="2000">2 s (under limit)</button>
+              <button type="button" data-action="delay" data-ms="8000">8 s (over limit)</button>
+            </div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N5</span><h4>Rate limiting</h4><span class="case-expect">200 + 429</span></header>
+            <p><code>/api/limited</code> allows 2 requests/s with a burst of 3. Extra requests are rejected by NGINX and never reach a pod.</p>
+            <div class="case-actions"><button type="button" data-action="rateLimit">Fire 15 at once</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N6</span><h4>Who answered?</h4><span class="case-expect">200 / 404</span></header>
+            <p><code>/nginx-health</code> is answered by NGINX alone. An unknown API path is forwarded and the app replies 404.</p>
+            <div class="case-actions">
+              <button type="button" class="secondary" data-action="nginxLocal">NGINX-only route</button>
+              <button type="button" data-action="appMissing">Unknown API path</button>
+            </div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">N7</span><h4>No ready endpoints</h4><span class="case-expect">502 → 200</span></header>
+            <p>Every pod withdraws readiness for 20 s. The Service has no endpoints, NGINX returns 502, then traffic recovers without anyone intervening.</p>
+            <div class="case-actions"><button type="button" data-action="outage" data-needs="cluster">Start 20 s outage</button></div>
+            <div class="timeline" data-timeline aria-label="Probe timeline"></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+        </div>
+
+        <div class="lab-group">
+          <h3>Kubernetes cases</h3>
+
+          <article class="case">
+            <header><span class="case-code">K1</span><h4>Readiness failure</h4><span class="case-expect">pod stays, gets no traffic</span></header>
+            <p>The pod that receives this request fails its readiness probe for 30 s. It keeps running but leaves the Service endpoints.</p>
+            <div class="case-actions"><button type="button" data-action="unready" data-needs="controls">Make one pod unready</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">K2</span><h4>Container crash</h4><span class="case-expect">RESTARTS +1</span></header>
+            <p>The process exits with code 1. The kubelet restarts the container in the same pod, so the pod name stays the same.</p>
+            <div class="case-actions"><button type="button" data-action="crash" data-needs="controls">Crash one container</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">K3</span><h4>Liveness failure</h4><span class="case-expect">restart after ~30 s</span></header>
+            <p>The process keeps running but its liveness probe starts failing. After 3 failed checks, 10 s apart, the kubelet kills and restarts it.</p>
+            <div class="case-actions"><button type="button" data-action="liveness" data-needs="controls">Break liveness</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">K4</span><h4>Pod deleted</h4><span class="case-expect">new pod name</span></header>
+            <p>A pod is removed. The ReplicaSet notices it is below the desired count and creates a replacement with a new name.</p>
+            <div class="case-actions"><button type="button" data-action="deletePod" data-needs="cluster">Delete a random pod</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">K5</span><h4>Scaling</h4><span class="case-expect">replicas change</span></header>
+            <p>Change the desired replica count. New pods take traffic only once they are ready; removed pods drain first.</p>
+            <div class="case-actions">
+              <input data-input="replicas" type="number" min="1" max="8" value="3" aria-label="Replica count">
+              <button type="button" data-action="scale" data-needs="cluster">Scale</button>
+            </div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+
+          <article class="case">
+            <header><span class="case-code">K6</span><h4>Rolling update</h4><span class="case-expect">zero downtime</span></header>
+            <p>Every pod is replaced in turn (maxSurge 1, maxUnavailable 1). Keep sending requests: they should keep succeeding.</p>
+            <div class="case-actions"><button type="button" data-action="restart" data-needs="cluster">Rolling restart</button></div>
+            <p class="case-result" data-result>Not run yet.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="cluster" aria-labelledby="cluster-title">
+      <div class="section-heading"><div><p class="section-kicker">Kubernetes view</p><h2 id="cluster-title">Cluster state</h2></div><span id="cluster-freshness" class="topology-caption">waiting for data</span></div>
+      <p id="cluster-unavailable" class="notice" hidden></p>
+      <div id="cluster-body" class="cluster-body">
+        <div class="cluster-grid">
+          <div class="panel">
+            <h3>Deployment <code>kubescale-app</code></h3>
+            <div class="counts">
+              <div><span id="dep-desired">-</span><small>desired</small></div>
+              <div><span id="dep-ready">-</span><small>ready</small></div>
+              <div><span id="dep-updated">-</span><small>up to date</small></div>
+              <div><span id="dep-available">-</span><small>available</small></div>
+            </div>
+            <p id="dep-rollout" class="panel-note">--</p>
+          </div>
+          <div class="panel">
+            <h3>NGINX <code id="nginx-pod">kubescale-nginx</code></h3>
+            <div class="counts">
+              <div><span id="ngx-active">-</span><small>active conns</small></div>
+              <div><span id="ngx-requests">-</span><small>total requests</small></div>
+              <div><span id="ngx-writing">-</span><small>writing</small></div>
+              <div><span id="ngx-waiting">-</span><small>idle keep-alive</small></div>
+            </div>
+            <p class="panel-note">From NGINX <code>stub_status</code>; counts include the page's own polling.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Pods</h3>
+          <div class="pod-table" role="table" aria-label="Application pods">
+            <div class="pod-row pod-head" role="row"><span role="columnheader">Pod</span><span role="columnheader">Status</span><span role="columnheader">Ready</span><span role="columnheader">Restarts</span><span role="columnheader">Pod IP</span><span role="columnheader">Age</span><span role="columnheader">Your hits</span><span role="columnheader"></span></div>
+            <div id="pod-rows"></div>
+          </div>
+        </div>
+
+        <div class="cluster-grid">
+          <div class="panel">
+            <h3>Service endpoints</h3>
+            <ul id="endpoint-list" class="plain-list"><li class="muted">No data yet.</li></ul>
+            <p class="panel-note">Only <b>ready</b> endpoints receive traffic from the Service.</p>
+          </div>
+          <div class="panel">
+            <h3>Recent events</h3>
+            <ul id="event-list" class="plain-list event-list"><li class="muted">No data yet.</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="history" aria-labelledby="history-title">
+      <div class="section-heading"><div><p class="section-kicker">Observability</p><h2 id="history-title">Recent request trail</h2></div><button id="clear-history" class="text-button" type="button">Clear trail</button></div>
+      <ol id="history-list" class="history-list"><li class="empty-state">Your request trail will appear here.</li></ol>
+    </section>
+
+    <section class="terminal-cases" aria-labelledby="terminal-title">
+      <div class="section-heading"><div><p class="section-kicker">Beyond the buttons</p><h2 id="terminal-title">Cases you trigger from a terminal</h2></div><span class="topology-caption">The page shows the result live</span></div>
+      <div class="terminal-grid">
+        <article class="panel">
+          <h3>NGINX itself goes down</h3>
+          <pre><code>kubectl delete pod -l app.kubernetes.io/name=kubescale-nginx</code></pre>
+          <p>The browser gets no HTTP response at all, so the topbar shows <b>NGINX unreachable</b>. Compare with N7, where NGINX is up but has nothing behind it. The NGINX Deployment replaces the pod within seconds.</p>
+        </article>
+        <article class="panel">
+          <h3>Bad image rollout</h3>
+          <pre><code>kubectl set image deployment/kubescale-app app=kubescale-demo:missing
+kubectl rollout undo deployment/kubescale-app</code></pre>
+          <p>New pods show <b>ErrImageNeverPull</b> because <code>imagePullPolicy</code> is <code>Never</code>. The rollout stalls, and the old ready pods keep serving.</p>
+        </article>
+        <article class="panel">
+          <h3>Broken release (never ready)</h3>
+          <pre><code>kubectl patch configmap kubescale-app-config -p '{"data":{"HEALTH_MODE":"unhealthy"}}'
+kubectl rollout restart deployment/kubescale-app
+# restore
+kubectl patch configmap kubescale-app-config -p '{"data":{"HEALTH_MODE":"healthy"}}'
+kubectl rollout restart deployment/kubescale-app</code></pre>
+          <p>New pods run but never become ready. With <code>maxUnavailable: 1</code>, one old pod is removed and the rollout then stops. The page shows reduced capacity and readiness-probe warnings, not a full outage.</p>
+        </article>
+        <article class="panel">
+          <h3>Not enough capacity</h3>
+          <pre><code>kubectl scale deployment/kubescale-app --replicas=40
+kubectl scale deployment/kubescale-app --replicas=3</code></pre>
+          <p>When the node runs out of CPU for the 50m requests, extra pods stay <b>Pending</b> and events show <b>FailedScheduling</b>. Pods that are already running are not affected.</p>
+        </article>
+      </div>
+    </section>
+
+    <footer><span>KUBESCALE DEMO</span><span>Stateless Express · Kubernetes · NGINX</span><span id="footer-time">--:--:--</span></footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

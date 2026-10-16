@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubescale-nginx-config
+  labels:
+    app.kubernetes.io/name: kubescale-nginx
+data:
+  nginx.conf: |
+    worker_processes auto;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      log_format upstream_log '$remote_addr [$time_local] "$request" $status rid=$request_id '
+                              'upstream=$upstream_addr upstream_status=$upstream_status '
+                              'request_time=$request_time upstream_time=$upstream_response_time';
+      access_log /dev/stdout upstream_log;
+      sendfile on;
+      keepalive_timeout 65;
+
+      # Behind a NodePort, most clients share the node IP, so this limit is effectively global for the demo.
+      limit_req_zone $binary_remote_addr zone=demo_limit:1m rate=2r/s;
+
+      # No upstream keepalive: every proxied request opens a new connection, so Kubernetes picks a pod each time.
+      upstream kubescale_app {
+        server kubescale-app.default.svc.cluster.local:3000;
+      }
+
+      # Reused upstream connections stay pinned to the pod that accepted them.
+      upstream kubescale_app_keepalive {
+        server kubescale-app.default.svc.cluster.local:3000;
+        keepalive 16;
+      }
+
+      server {
+        listen 8080;
+        server_name _;
+
+        add_header X-Proxy-Host $hostname always;
+        add_header X-Request-ID $request_id always;
+        add_header X-Upstream-Addr $upstream_addr always;
+        add_header X-Upstream-Status $upstream_status always;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+
+        # Errors NGINX generates itself are returned as JSON so the page can tell them apart from app errors.
+        error_page 429 /__nginx/429;
+        error_page 502 /__nginx/502;
+        error_page 504 /__nginx/504;
+
+        location / {
+          proxy_pass http://kubescale_app;
+        }
+
+        location = /api/simulate-delay {
+          proxy_read_timeout 5s;
+          proxy_pass http://kubescale_app;
+        }
+
+        location = /api/limited {
+          limit_req zone=demo_limit burst=3 nodelay;
+          limit_req_status 429;
+          proxy_pass http://kubescale_app;
+        }
+
+        location = /api/keepalive/info {
+          proxy_pass http://kubescale_app_keepalive;
+        }
+
+        # Answered by NGINX alone, so probes and the page can check the proxy without depending on the app.
+        location = /nginx-health {
+          default_type application/json;
+          return 200 '{"source":"nginx","status":"ok","proxy":"$hostname"}';
+        }
+
+        location = /nginx-status {
+          stub_status;
+        }
+
+        location = /__nginx/429 {
+          internal;
+          default_type application/json;
+          return 429 '{"source":"nginx","status":429,"error":"Too Many Requests","detail":"NGINX rate limit (2 r/s, burst 3) rejected this request before it reached Kubernetes.","proxy":"$hostname","requestId":"$request_id"}';
+        }
+
+        location = /__nginx/502 {
+          internal;
+          default_type application/json;
+          return 502 '{"source":"nginx","status":502,"error":"Bad Gateway","detail":"NGINX could not connect to the kubescale-app Service. Usually this means no pod is ready, so the Service has no endpoints.","upstream":"$upstream_addr","proxy":"$hostname","requestId":"$request_id"}';
+        }
+
+        location = /__nginx/504 {
+          internal;
+          default_type application/json;
+          return 504 '{"source":"nginx","status":504,"error":"Gateway Timeout","detail":"The app pod did not answer before the NGINX proxy_read_timeout expired.","upstream":"$upstream_addr","proxy":"$hostname","requestId":"$request_id"}';
+        }
+      }
+    }

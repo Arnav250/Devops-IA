@@ -1,0 +1,44 @@
+# Lets the app read its own Deployment, pods, endpoints and events for the frontend cluster view,
+# and perform the demo actions (delete a pod, scale, rolling restart) when ENABLE_TEST_CONTROLS is true.
+# Scoped to this namespace; Deployment access is limited to kubescale-app by name.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubescale-app
+  labels:
+    app.kubernetes.io/name: kubescale-app
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubescale-app-demo
+  labels:
+    app.kubernetes.io/name: kubescale-app
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    resourceNames: ["kubescale-app"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubescale-app-demo
+  labels:
+    app.kubernetes.io/name: kubescale-app
+subjects:
+  - kind: ServiceAccount
+    name: kubescale-app
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubescale-app-demo
